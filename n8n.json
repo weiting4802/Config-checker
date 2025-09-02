@@ -1,0 +1,54 @@
+{
+  "name": "Git Repo Folder to Context",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const { execSync } = require('child_process');\nconst fs = require('fs');\nconst path = require('path');\n\n// Repo 設定\nconst repoUrl = 'https://github.com/your-org/your-repo.git';\nconst localPath = '/tmp/n8n-repo';\nconst folderToRead = 'src'; // repo 下資料夾名稱\n\n// Clone 或 Pull\nif (!fs.existsSync(localPath)) {\n  execSync(`git clone ${repoUrl} ${localPath}`);\n} else {\n  execSync(`cd ${localPath} && git pull`);\n}\n\n// 遍歷資料夾檔案\nconst folderPath = path.join(localPath, folderToRead);\nconst files = fs.readdirSync(folderPath);\nconst items = [];\n\nfiles.forEach(file => {\n  const fullPath = path.join(folderPath, file);\n  if (fs.statSync(fullPath).isFile()) {\n    const content = fs.readFileSync(fullPath, 'utf8');\n    items.push({ json: { filename: file, content } });\n  }\n});\n\nreturn items;"
+      },
+      "name": "Clone & Read Git Folder",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// 將檔案內容整合成 context\nlet context = '';\n$items().forEach(item => {\n  context += `### ${item.json.filename}\\n` + item.json.content + '\\n\\n';\n});\nreturn [{ json: { context } }];"
+      },
+      "name": "Build Context",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Clone & Read Git Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clone & Read Git Folder": {
+      "main": [
+        [
+          {
+            "node": "Build Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
